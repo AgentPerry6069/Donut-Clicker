@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Donut Clicker</title>
+    <link rel="stylesheet" href="style/color.css">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.0/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .notification {
+            background-color: #38a169;
+            /* Tailwind green-600 */
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            display: none;
+            z-index: 1000;
+        }
+
+        .notification.show {
+            display: block;
+        }
+
+        .upgrade-button {
+            background-color: #4A5568;
+            /* Tailwind gray-700 */
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            margin-right: 0.5rem;
+        }
+
+        body {
+            background-color: #fbb6ce;
+            /* Tailwind pink-300 */
+        }
+
+        .leaderboard {
+            background-color: #e2e8f0;
+            /* Tailwind gray-200 */
+            padding: 1rem;
+            border-radius: 0.25rem;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .upgrade-cost {
+            margin-top: 0.5rem;
+        }
+
+        .leaderboard-button {
+            background-color: #3182ce;
+            /* Tailwind blue-600 */
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            margin-top: 1rem;
+        }
+
+        .username-input {
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Notification -->
+    <div id="notification" class="notification"></div>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-4">Donut Clicker</h1>
+        <p class="mb-4">
+            Donuts: <span id="no_of_donuts">0</span>
+            Workers: <span id="no_of_workers">0</span>
+            Money: <span id="no_of_money">0</span>
+        </p>
+
+        <button onclick="makeDonuts()" class="bg-blue-500 text-white px-4 py-2 rounded mr-2">Fry Donuts</button>
+        <button onclick="hireWorker()" class="bg-green-500 text-white px-4 py-2 rounded mr-2">Hire Worker $<span
+                id="cow">10</span></button>
+        <button onclick="convertToMoney()" class="bg-red-500 text-white px-4 py-2 rounded">Sell Donuts</button>
+
+        <div class="mt-6">
+            <h2 class="text-2xl font-bold mb-4">Upgrades</h2>
+            <button onclick="buyUpgrade('efficiency')" class="upgrade-button">Increase Efficiency</button>
+            <p id="efficiency-cost" class="upgrade-cost">Next cost: $100</p>
+            <button onclick="buyUpgrade('workerSpeed')" class="upgrade-button">Speed Up Workers</button>
+            <p id="workerSpeed-cost" class="upgrade-cost">Next cost: $200</p>
+            <button onclick="buyUpgrade('automation')" class="upgrade-button">Automate Production</button>
+            <p id="automation-cost" class="upgrade-cost">Next cost: $500</p>
+            <button onclick="buyUpgrade('donutQuality')" class="upgrade-button">Improve Donut Quality</button>
+            <p id="donutQuality-cost" class="upgrade-cost">Next cost: $1000</p>
+        </div>
+
+        <!-- Username Input and Submit Score Button -->
+        <div class="username-input">
+            <input type="text" id="playerName" placeholder="Enter your username" class="border p-2 rounded mr-2">
+            <button onclick="submitScore()" class="bg-purple-500 text-white px-4 py-2 rounded">Submit Score</button>
+        </div>
+
+        <!-- Leaderboard Button -->
+        <button onclick="toggleLeaderboard()" class="leaderboard-button">View Leaderboard</button>
+
+        <!-- Leaderboard -->
+        <div id="leaderboard" class="leaderboard">
+            <h2 class="text-xl font-bold mb-2">Leaderboard</h2>
+            <div id="leaderboard-content">
+                <!-- Leaderboard entries will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Reset Game Button -->
+        <button onclick="resetGame()" class="bg-yellow-500 text-white px-4 py-2 rounded mt-4">Reset Game</button>
+    </div>
+
+    <script>
+        // Game Variables
+        let donuts = 0;
+        let workers = 0;
+        let donutsMultiple = 1;
+        let areWorkersWorking = false;
+        let money = 0;
+        let cost_of_worker = 10;
+        let workerSpeedUpgrade = 0;
+        let workerInterval;
+        let automatedProduction = false;
+        let donutQualityUpgrade = 0;
+
+        // Upgrade base costs
+        const baseCosts = {
+            efficiency: 100,
+            workerSpeed: 200,
+            automation: 500,
+            donutQuality: 1000
+        };
+
+        // Load game state from localStorage
+        window.onload = function () {
+            if (localStorage.getItem('donuts')) {
+                donuts = parseInt(localStorage.getItem('donuts'), 10);
+                workers = parseInt(localStorage.getItem('workers'), 10);
+                money = parseFloat(localStorage.getItem('money'));
+                cost_of_worker = parseFloat(localStorage.getItem('cost_of_worker'));
+                donutsMultiple = parseInt(localStorage.getItem('donutsMultiple'), 10);
+                workerSpeedUpgrade = parseInt(localStorage.getItem('workerSpeedUpgrade'), 10) || 0;
+                automatedProduction = localStorage.getItem('automatedProduction') === 'true';
+                donutQualityUpgrade = parseInt(localStorage.getItem('donutQualityUpgrade'), 10) || 0;
+                updateDisplay();
+                updateLeaderboard();
+                updateUpgradeCosts();
+            }
+
+            // Refresh leaderboard every 10 seconds
+            setInterval(updateLeaderboard, 10000);
+        };
+
+        function updateDisplay() {
+            document.getElementById('no_of_donuts').innerText = donuts;
+            document.getElementById('no_of_workers').innerText = workers;
+            document.getElementById('no_of_money').innerText = money.toFixed(2);
+            document.getElementById('cow').innerText = cost_of_worker.toFixed(2);
+        }
+
+        function showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.innerText = message;
+            notification.classList.add('show');
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        function saveGame() {
+            localStorage.setItem('donuts', donuts);
+            localStorage.setItem('workers', workers);
+            localStorage.setItem('money', money);
+            localStorage.setItem('cost_of_worker', cost_of_worker);
+            localStorage.setItem('donutsMultiple', donutsMultiple);
+            localStorage.setItem('workerSpeedUpgrade', workerSpeedUpgrade);
+            localStorage.setItem('automatedProduction', automatedProduction);
+            localStorage.setItem('donutQualityUpgrade', donutQualityUpgrade);
+        }
+
+        // Function to update leaderboard display
+        function updateLeaderboard() {
+            let leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || [];
+            leaderboard = leaderboard.sort((a, b) => b.money - a.money);
+
+            const leaderboardElement = document.getElementById('leaderboard-content');
+            leaderboardElement.innerHTML = leaderboard.map(entry =>
+                `<p>${entry.name}: $${entry.money.toFixed(2)}</p>`
+            ).join('');
+        }
+
+        // Function to submit the player's score
+        function submitScore() {
+            const name = document.getElementById('playerName').value.trim();
+            if (name) {
+                let leaderboard = JSON.parse(localStorage.getItem('leaderboard')) || [];
+
+                // Check if the player is already on the leaderboard
+                const existingPlayer = leaderboard.find(entry => entry.name === name);
+
+                if (existingPlayer) {
+                    // Update player's money if already on leaderboard
+                    existingPlayer.money = money;
+                } else {
+                    // Add new entry if player is not on leaderboard
+                    leaderboard.push({ name, money });
+                }
+
+                // Sort and keep only top 10 players
+                leaderboard = leaderboard.sort((a, b) => b.money - a.money).slice(0, 10);
+
+                localStorage.setItem('leaderboard', JSON.stringify(leaderboard));
+                updateLeaderboard();
+                showNotification('Score submitted!');
+            } else {
+                showNotification('Please enter a valid username.');
+            }
+        }
+
+        function toggleLeaderboard() {
+            const leaderboard = document.getElementById('leaderboard');
+            if (leaderboard.style.display === 'none') {
+                leaderboard.style.display = 'block';
+                updateLeaderboard();
+            } else {
+                leaderboard.style.display = 'none';
+            }
+        }
+
+        // Example functions for making donuts, hiring workers, and selling donuts
+        function makeDonuts() {
+            donuts += donutsMultiple;
+            saveGame();
+            updateDisplay();
+        }
+
+        function hireWorker() {
+            if (money >= cost_of_worker) {
+                workers += 1;
+                money -= cost_of_worker;
+                cost_of_worker *= 1.1; // Workers become more expensive
+                if (!areWorkersWorking) {
+                    startWorkers();
+                }
+                saveGame();
+                updateDisplay();
+            } else {
+                showNotification('Not enough money to hire a worker!');
+            }
+        }
+
+        function startWorkers() {
+            areWorkersWorking = true;
+            workerInterval = setInterval(() => {
+                donuts += workers * donutsMultiple;
+                saveGame();
+                updateDisplay();
+            }, 1000 - workerSpeedUpgrade);
+        }
+
+        function convertToMoney() {
+            if (donuts >= 10) {
+                const moneyEarned = Math.floor(donuts / 10);
+                money += moneyEarned;
+                donuts -= moneyEarned * 10; // Remove converted donuts
+                saveGame();
+                updateDisplay();
+            } else {
+                showNotification('Not enough donuts to sell!');
+            }
+        }
+
+        function buyUpgrade(upgradeType) {
+            const upgradeCosts = {
+                efficiency: baseCosts.efficiency,
+                workerSpeed: baseCosts.workerSpeed,
+                automation: baseCosts.automation,
+                donutQuality: baseCosts.donutQuality
+            };
+
+            switch (upgradeType) {
+                case 'efficiency':
+                    if (money >= upgradeCosts.efficiency) {
+                        money -= upgradeCosts.efficiency;
+                        donutsMultiple += 1;
+                        baseCosts.efficiency *= 1.5;
+                    }
+                    break;
+                case 'workerSpeed':
+                    if (money >= upgradeCosts.workerSpeed) {
+                        money -= upgradeCosts.workerSpeed;
+                        workerSpeedUpgrade += 100;
+                        baseCosts.workerSpeed *= 1.5;
+                    }
+                    break;
+                case 'automation':
+                    if (money >= upgradeCosts.automation && !automatedProduction) {
+                        money -= upgradeCosts.automation;
+                        automatedProduction = true;
+                        baseCosts.automation *= 1.5;
+                        startWorkers();
+                    }
+                    break;
+                case 'donutQuality':
+                    if (money >= upgradeCosts.donutQuality) {
+                        money -= upgradeCosts.donutQuality;
+                        donutQualityUpgrade += 1;
+                        baseCosts.donutQuality *= 1.5;
+                    }
+                    break;
+            }
+
+            saveGame();
+            updateUpgradeCosts();
+            updateDisplay();
+        }
+
+        function updateUpgradeCosts() {
+            document.getElementById('efficiency-cost').innerText = `Next cost: $${baseCosts.efficiency}`;
+            document.getElementById('workerSpeed-cost').innerText = `Next cost: $${baseCosts.workerSpeed}`;
+            document.getElementById('automation-cost').innerText = `Next cost: $${baseCosts.automation}`;
+            document.getElementById('donutQuality-cost').innerText = `Next cost: $${baseCosts.donutQuality}`;
+        }
+
+        function resetGame() {
+            localStorage.clear();
+            location.reload();
+        }
+    </script>
+</body>
+
+</html>
